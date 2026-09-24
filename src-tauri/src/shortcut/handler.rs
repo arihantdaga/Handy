@@ -33,6 +33,9 @@ pub fn handle_shortcut_event(
     is_pressed: bool,
 ) {
     let settings = get_settings(app);
+    if binding_id == "scribe" && crate::scribe::is_busy(app) {
+        return;
+    }
 
     // Transcribe bindings are handled by the coordinator.
     if is_transcribe_binding(binding_id) {
@@ -60,9 +63,20 @@ pub fn handle_shortcut_event(
 
     // Cancel binding: only fires when recording and key is pressed
     if binding_id == "cancel" {
+        if is_pressed
+            && crate::scribe::is_active(app)
+            && !app.state::<Arc<AudioRecordingManager>>().is_recording()
+        {
+            crate::scribe::cancel(app);
+            return;
+        }
         let audio_manager = app.state::<Arc<AudioRecordingManager>>();
         if audio_manager.is_recording() && is_pressed {
-            action.start(app, binding_id, hotkey_string);
+            if crate::scribe::owns_audio(app) {
+                crate::scribe::cancel(app);
+            } else {
+                action.start(app, binding_id, hotkey_string);
+            }
         }
         return;
     }

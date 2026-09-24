@@ -480,6 +480,9 @@ mod imp {
                 if id == "cancel" && !state.cancel_requested.load(Ordering::SeqCst) {
                     continue;
                 }
+                if id == "scribe" && (!settings.scribe.enabled || !cfg!(target_os = "macos")) {
+                    continue;
+                }
                 if id == "transcribe_with_post_process" && !settings.post_process_enabled {
                     continue;
                 }

@@ -434,6 +434,9 @@ pub fn init_shortcuts(app: &AppHandle) -> Result<(), String> {
             continue;
         }
         // Skip post-processing shortcut when the feature is disabled
+        if id == "scribe" && (!user_settings.scribe.enabled || !cfg!(target_os = "macos")) {
+            continue;
+        }
         if id == "transcribe_with_post_process" && !user_settings.post_process_enabled {
             continue;
         }

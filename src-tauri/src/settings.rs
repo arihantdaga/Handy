@@ -445,6 +445,8 @@ pub struct AppSettings {
     pub auto_submit_key: AutoSubmitKey,
     #[serde(default = "default_post_process_enabled")]
     pub post_process_enabled: bool,
+    #[serde(default)]
+    pub scribe: crate::scribe::ScribeSettings,
     #[serde(default = "default_post_process_provider_id")]
     pub post_process_provider_id: String,
     #[serde(default = "default_post_process_providers")]
@@ -897,6 +899,16 @@ pub fn get_default_settings() -> AppSettings {
         },
     );
     bindings.insert(
+        "scribe".to_string(),
+        ShortcutBinding {
+            id: "scribe".to_string(),
+            name: "Scribe Shortcut".to_string(),
+            description: "Speak an instruction to draft or revise text.".to_string(),
+            default_binding: "ctrl+option+space".to_string(),
+            current_binding: "ctrl+option+space".to_string(),
+        },
+    );
+    bindings.insert(
         "cancel".to_string(),
         ShortcutBinding {
             id: "cancel".to_string(),
@@ -942,6 +954,7 @@ pub fn get_default_settings() -> AppSettings {
         auto_submit: default_auto_submit(),
         auto_submit_key: AutoSubmitKey::default(),
         post_process_enabled: default_post_process_enabled(),
+        scribe: crate::scribe::ScribeSettings::default(),
         post_process_provider_id: default_post_process_provider_id(),
         post_process_providers: default_post_process_providers(),
         post_process_api_keys: default_post_process_api_keys(),

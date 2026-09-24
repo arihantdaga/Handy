@@ -57,6 +57,7 @@ pub trait ShortcutAction: Send + Sync {
 // Transcribe Action
 struct TranscribeAction {
     post_process: bool,
+    scribe: bool,
 }
 
 /// Field name for structured output JSON schema
@@ -468,6 +469,12 @@ pub(crate) async fn process_transcription_output(
 
 impl ShortcutAction for TranscribeAction {
     fn start(&self, app: &AppHandle, binding_id: &str, _shortcut_str: &str) {
+        if self.scribe {
+            if let Err(error) = crate::scribe::begin_voice(app) {
+                log::debug!("Scribe did not start: {error}");
+                return;
+            }
+        }
         let start_time = Instant::now();
         debug!("TranscribeAction::start called for binding: {}", binding_id);
 
@@ -523,10 +530,14 @@ impl ShortcutAction for TranscribeAction {
         // doesn't stream (or whose capability is not known yet) gets the compact
         // pill instead of an oversized transparent live window.
         let overlay_started = Instant::now();
-        match settings.overlay_style {
-            OverlayStyle::Live if model_supports_streaming => utils::show_streaming_overlay(app),
-            OverlayStyle::Live | OverlayStyle::Minimal => show_recording_overlay(app),
-            OverlayStyle::None => {} // show_overlay_state no-ops on None anyway
+        if !self.scribe {
+            match settings.overlay_style {
+                OverlayStyle::Live if model_supports_streaming => {
+                    utils::show_streaming_overlay(app)
+                }
+                OverlayStyle::Live | OverlayStyle::Minimal => show_recording_overlay(app),
+                OverlayStyle::None => {} // show_overlay_state no-ops on None anyway
+            }
         }
         // Everything above runs before capture can begin, so each span here is
         // added keypress->capture latency.
@@ -604,6 +615,9 @@ impl ShortcutAction for TranscribeAction {
             // Starting failed (for example due to blocked microphone permissions).
             // Revert UI state so we don't stay stuck in the recording overlay.
             tm.cancel_stream();
+            if self.scribe {
+                crate::scribe::fail_capture(app);
+            }
             utils::hide_recording_overlay(app);
             set_tray_state(app, TrayIconState::Idle);
             if let Some(err) = recording_error {
@@ -636,8 +650,10 @@ impl ShortcutAction for TranscribeAction {
         app.state::<Arc<AudioRecordingManager>>()
             .invalidate_recording_readiness();
 
-        // Unregister the cancel shortcut when transcription stops
-        shortcut::unregister_cancel_shortcut(app);
+        // Scribe keeps cancellation available until its result is ready.
+        if !self.scribe {
+            shortcut::unregister_cancel_shortcut(app);
+        }
 
         let stop_time = Instant::now();
         debug!("TranscribeAction::stop called for binding: {}", binding_id);
@@ -656,11 +672,18 @@ impl ShortcutAction for TranscribeAction {
         // Capture this before finalizing the stream so every later working state
         // targets the same overlay that was shown for this transcription.
         let use_streaming_overlay = should_use_streaming_overlay(style, tm.is_streaming());
-        if use_streaming_overlay {
-            tm.emit_stream_working(StreamWorkKind::Transcribing);
-        } else {
-            show_transcribing_overlay(app);
+        if !self.scribe {
+            if use_streaming_overlay {
+                tm.emit_stream_working(StreamWorkKind::Transcribing);
+            } else {
+                show_transcribing_overlay(app);
+            }
         }
+        let scribe_id = if self.scribe {
+            crate::scribe::transcribing(app)
+        } else {
+            None
+        };
 
         // Unmute before playing audio feedback so the stop sound is audible
         rm.remove_mute();
@@ -670,6 +693,7 @@ impl ShortcutAction for TranscribeAction {
 
         let binding_id = binding_id.to_string(); // Clone binding_id for the async task
         let post_process = self.post_process;
+        let is_scribe = self.scribe;
         let cancel_generation = rm.cancel_generation();
 
         tauri::async_runtime::spawn(async move {
@@ -679,6 +703,11 @@ impl ShortcutAction for TranscribeAction {
                 binding_id
             );
 
+            if is_scribe && scribe_id.is_none() {
+                rm.cancel_recording();
+                tm.cancel_stream();
+                return;
+            }
             let stop_recording_time = Instant::now();
             if let Some(samples) = rm.stop_recording(&binding_id, cancel_generation) {
                 debug!(
@@ -692,6 +721,27 @@ impl ShortcutAction for TranscribeAction {
                     tm.cancel_stream();
                     utils::hide_recording_overlay(&ah);
                     set_tray_state(&ah, TrayIconState::Idle);
+                    return;
+                }
+
+                if let Some(id) = scribe_id {
+                    let result = if samples.is_empty() {
+                        tm.cancel_stream();
+                        Err(anyhow::anyhow!("No audio samples"))
+                    } else {
+                        match tm.finalize_stream() {
+                            Ok(Some(text)) if !text.trim().is_empty() => Ok(text),
+                            Ok(_) => tm.transcribe(samples),
+                            Err(error) => Err(error),
+                        }
+                    };
+                    set_tray_state(&ah, TrayIconState::Idle);
+                    if !rm.was_cancelled_since(cancel_generation) {
+                        match result {
+                            Ok(text) => crate::scribe::accept_transcript(&ah, id, text).await,
+                            Err(_) => crate::scribe::fail(&ah, id, "transcription_failed"),
+                        }
+                    }
                     return;
                 }
 
@@ -875,6 +925,9 @@ impl ShortcutAction for TranscribeAction {
                     }
                 }
             } else {
+                if let Some(id) = scribe_id {
+                    crate::scribe::fail(&ah, id, "transcription_failed");
+                }
                 debug!("No samples retrieved from recording stop");
                 // Tear down any streaming worker so its channel doesn't leak.
                 tm.cancel_stream();
@@ -933,11 +986,22 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
         "transcribe".to_string(),
         Arc::new(TranscribeAction {
             post_process: false,
+            scribe: false,
         }) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "transcribe_with_post_process".to_string(),
-        Arc::new(TranscribeAction { post_process: true }) as Arc<dyn ShortcutAction>,
+        Arc::new(TranscribeAction {
+            post_process: true,
+            scribe: false,
+        }) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
+        "scribe".to_string(),
+        Arc::new(TranscribeAction {
+            post_process: false,
+            scribe: true,
+        }) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "cancel".to_string(),

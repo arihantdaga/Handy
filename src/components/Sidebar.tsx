@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Cog, FlaskConical, History, Info, Sparkles, Cpu } from "lucide-react";
 import HandyTextLogo from "./icons/HandyTextLogo";
 import HandyHand from "./icons/HandyHand";
+import ScribeSettings from "./settings/scribe/ScribeSettings";
+import { platform } from "@tauri-apps/plugin-os";
 import { useSettings } from "../hooks/useSettings";
 import {
   GeneralSettings,
@@ -61,6 +63,12 @@ export const SECTIONS_CONFIG = {
     icon: Sparkles,
     component: PostProcessingSettings,
     enabled: (settings) => settings?.post_process_enabled ?? false,
+  },
+  scribe: {
+    labelKey: "scribe.title",
+    icon: Sparkles,
+    component: ScribeSettings,
+    enabled: () => platform() === "macos",
   },
   debug: {
     labelKey: "sidebar.debug",
