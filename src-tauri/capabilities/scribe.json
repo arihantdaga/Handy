@@ -1,0 +1,6 @@
+{
+  "identifier": "scribe-panel",
+  "description": "Scribe can receive state events and handle its window.",
+  "windows": ["scribe"],
+  "permissions": ["core:event:default", "core:window:allow-start-dragging"]
+}

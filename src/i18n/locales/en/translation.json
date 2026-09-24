@@ -179,6 +179,10 @@
           "transcribe_with_post_process": {
             "name": "Post-Processing Hotkey",
             "description": "Optional: A dedicated hotkey that always applies AI post-processing to your transcription."
+          },
+          "scribe": {
+            "name": "Scribe Shortcut",
+            "description": "Speak an instruction to draft or revise text."
           }
         },
         "errors": {
@@ -714,5 +718,81 @@
     "learnMore": "How to fix",
     "recorderBlocked": "Can't record shortcuts right now — macOS Secure Input is blocking key events. Resolve the Secure Input warning first.",
     "dismiss": "Dismiss"
+  },
+  "scribe": {
+    "title": "Scribe",
+    "destination": "Insert into {{app}}",
+    "close": "Close Scribe",
+    "ready": "Use your Scribe shortcut to start.",
+    "clipboard": "Copied text",
+    "remove": "Remove context",
+    "speakHint": "Speak your instruction, then release the shortcut or select Stop.",
+    "emptyDraft": "Speak an instruction or enter one below.",
+    "copyFallback": "Handy could not identify an editable destination. Use Copy to move the result.",
+    "instruction": "Instruction",
+    "followupPlaceholder": "Make it shorter, change the tone, or ask a follow-up…",
+    "generate": "Generate",
+    "rewrite": "Rewrite",
+    "regenerate": "Regenerate",
+    "copy": "Copy result",
+    "copied": "Copied",
+    "insert": "Insert",
+    "versions": "Draft versions",
+    "previous": "Previous version",
+    "next": "Next version",
+    "versionCount": "{{current}} / {{total}}",
+    "stop": "Stop",
+    "phases": {
+      "capture": "Speak your instruction",
+      "transcribe": "Convert speech to text…",
+      "generate": "Create your draft…",
+      "insert": "Insert the result…"
+    },
+    "settings": {
+      "description": "Speak an instruction. Review the result before you insert it. Available on macOS.",
+      "enabled": "Enable Scribe",
+      "enabledDescription": "Use a separate shortcut to create drafts and revise text.",
+      "clipboard": "Use copied text as context",
+      "clipboardDescription": "Scribe sends copied text to your selected provider with your instruction. Remove the context before you stop if it is not relevant.",
+      "modelTitle": "Language model",
+      "shared": "Use Post Process model",
+      "sharedDescription": "Use the same provider, credentials, and model. Scribe uses its own prompt.",
+      "currentModel": "Current model",
+      "notConfigured": "No model configured",
+      "modelPlaceholder": "Select or enter a model",
+      "keyDescription": "This credential is shared with Post Process for the selected provider.",
+      "sharedModel": "Shared model",
+      "style": "Style instructions",
+      "stylePlaceholder": "For example: use short sentences and a friendly tone."
+    },
+    "errors": {
+      "context_too_large": "The copied text exceeds 20,000 characters. Remove it, or start a new session with less text.",
+      "empty_instruction": "Speak or enter an instruction.",
+      "instruction_too_large": "Use an instruction with at most 4,000 characters.",
+      "empty_result": "The provider returned no text. Try again.",
+      "result_too_large": "The result is too long. Ask for a shorter reply.",
+      "provider_missing": "Select a provider in Scribe settings.",
+      "provider_unsupported": "Select an OpenAI-compatible provider for Scribe.",
+      "model_missing": "Configure a model in Scribe or Post Process settings.",
+      "request_failed": "The request failed. Check the provider, API key, and model, then try again.",
+      "request_timeout": "The provider did not respond within 90 seconds. Try again.",
+      "session_unavailable": "Scribe is unavailable. Close this panel and try again.",
+      "session_expired": "This session has closed. Start a new Scribe session.",
+      "busy": "Wait for the current operation to finish.",
+      "clipboard_failed": "Handy could not copy the result. Try again.",
+      "destination_changed": "The destination changed. Copy the result and paste it where you need it.",
+      "destination_closed": "The destination closed. Use Copy to keep the result.",
+      "destination_unavailable": "Handy could not restore the destination. Use Copy to move the result.",
+      "paste_failed": "Handy could not confirm the paste. Check the destination before you try again, or use Copy.",
+      "microphone_failed": "Handy could not start the microphone. Check microphone access and the selected device.",
+      "transcription_failed": "Handy could not transcribe the audio. Check the speech model and try again.",
+      "unsupported_paste_method": "Use Copy, or select a supported paste method in Advanced settings.",
+      "version_missing": "This draft is unavailable. Select another version.",
+      "shortcut_missing": "The Scribe shortcut is unavailable. Restart Handy.",
+      "disabled": "Enable Scribe in settings.",
+      "unsupported_platform": "Scribe currently requires macOS.",
+      "session_changed": "The draft changed. Review the current result before you try again.",
+      "provider_unavailable": "Apple Intelligence is unavailable on this Mac. Select another provider."
+    }
   }
 }

@@ -772,7 +772,36 @@ fn should_send_auto_submit(auto_submit: bool, paste_method: PasteMethod) -> bool
 }
 
 pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
-    let settings = get_settings(&app_handle);
+    paste_with_settings(text, app_handle.clone(), get_settings(&app_handle), false)
+}
+
+pub fn paste_scribe(text: String, app_handle: AppHandle) -> Result<(), String> {
+    let settings = scribe_paste_settings(get_settings(&app_handle))?;
+    paste_with_settings(text, app_handle, settings, true)
+}
+
+fn scribe_paste_settings(
+    mut settings: crate::settings::AppSettings,
+) -> Result<crate::settings::AppSettings, String> {
+    settings.auto_submit = false;
+    settings.append_trailing_space = false;
+    if matches!(
+        settings.paste_method,
+        PasteMethod::None | PasteMethod::ExternalScript
+    ) {
+        return Err("unsupported_paste_method".into());
+    }
+    // The guarded macOS transaction preserves a newer user copy.
+    settings.reliable_paste = true;
+    Ok(settings)
+}
+
+fn paste_with_settings(
+    text: String,
+    app_handle: AppHandle,
+    settings: crate::settings::AppSettings,
+    guarded: bool,
+) -> Result<(), String> {
     let paste_method = settings.paste_method;
     let paste_delay_ms = settings.paste_delay_ms;
     let paste_delay_after_ms = settings.paste_delay_after_ms;
@@ -823,6 +852,7 @@ pub fn paste(text: String, app_handle: AppHandle) -> Result<(), String> {
                 });
                 match reliable_result {
                     Ok(()) => return Ok(()),
+                    Err(e) if guarded => return Err(e),
                     Err(e) => {
                         log::warn!("Reliable paste unavailable ({e}); falling back to legacy paste")
                     }
@@ -1011,5 +1041,36 @@ e.g. 28:1 28:0 means pressing on the Enter button on a standard US keyboard.
             .expect("external script should return without waiting for its child");
         fs::remove_file(script_path).expect("remove external script");
         assert!(result.is_ok());
+    }
+}
+
+#[cfg(test)]
+mod scribe_tests {
+    use super::*;
+    #[test]
+    fn scribe_overrides_output_options_without_changing_dictation() {
+        let original = crate::settings::AppSettings {
+            auto_submit: true,
+            append_trailing_space: true,
+            reliable_paste: false,
+            paste_method: PasteMethod::CtrlV,
+            ..Default::default()
+        };
+        let scribe = scribe_paste_settings(original.clone()).unwrap();
+        assert!(!scribe.auto_submit);
+        assert!(!scribe.append_trailing_space);
+        assert!(scribe.reliable_paste);
+        assert!(original.auto_submit);
+        assert!(original.append_trailing_space);
+    }
+    #[test]
+    fn scribe_rejects_disabled_paste_and_external_scripts() {
+        for method in [PasteMethod::None, PasteMethod::ExternalScript] {
+            let settings = crate::settings::AppSettings {
+                paste_method: method,
+                ..Default::default()
+            };
+            assert!(scribe_paste_settings(settings).is_err());
+        }
     }
 }

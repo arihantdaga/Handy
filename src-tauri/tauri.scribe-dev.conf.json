@@ -1,0 +1,5 @@
+{
+  "productName": "Handy Scribe Dev",
+  "identifier": "com.pais.handy.scribe-dev",
+  "bundle": { "createUpdaterArtifacts": false }
+}

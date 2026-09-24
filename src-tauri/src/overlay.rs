@@ -248,16 +248,28 @@ fn calculate_overlay_position(
     width: f64,
     height: f64,
 ) -> Option<(f64, f64)> {
+    calculate_panel_position(
+        app_handle,
+        width,
+        height,
+        settings::get_settings(app_handle).overlay_position,
+    )
+}
+
+pub(crate) fn calculate_panel_position(
+    app_handle: &AppHandle,
+    width: f64,
+    height: f64,
+    position: OverlayPosition,
+) -> Option<(f64, f64)> {
     let monitor = get_monitor_with_cursor(app_handle)?;
     let scale = monitor.scale_factor();
     let monitor_x = monitor.position().x as f64 / scale;
     let monitor_y = monitor.position().y as f64 / scale;
     let monitor_width = monitor.size().width as f64 / scale;
 
-    let settings = settings::get_settings(app_handle);
-
     let x = monitor_x + (monitor_width - width) / 2.0;
-    let y = match settings.overlay_position {
+    let y = match position {
         OverlayPosition::Top => monitor_y + OVERLAY_TOP_OFFSET,
         OverlayPosition::Bottom => {
             // work_area.position shares monitor.position's global coordinate
@@ -736,7 +748,7 @@ pub fn emit_levels(app_handle: &AppHandle, levels: &[f32]) {
     // directly characterized; see issue #1279 for the investigation).
     // For users with `overlay_style: none` (the Linux default) this skip
     // eliminates the upstream driver of that accumulation.
-    if !OVERLAY_ENABLED.load(Ordering::Relaxed) {
+    if !OVERLAY_ENABLED.load(Ordering::Relaxed) && !crate::scribe::capture_active() {
         return;
     }
 
@@ -763,7 +775,12 @@ pub fn emit_levels(app_handle: &AppHandle, levels: &[f32]) {
     // `emit_to` with the overlay's window label produces a single
     // eval_script call per callback, cutting the per-callback WebKit
     // dispatch work in half.
-    let _ = app_handle.emit_to("recording_overlay", "mic-level", levels);
+    let target = if crate::scribe::capture_active() {
+        "scribe"
+    } else {
+        "recording_overlay"
+    };
+    let _ = app_handle.emit_to(target, "mic-level", levels);
 }
 
 #[cfg(test)]
